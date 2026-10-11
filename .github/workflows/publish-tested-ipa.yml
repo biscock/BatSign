@@ -1,0 +1,45 @@
+name: Publish tested Share Install IPA
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-tested-ipa.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publish-share-install
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: v0.0.4-share-install
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and validate the tested IPA
+        run: |
+          set -euo pipefail
+          gh api repos/$GH_REPO/actions/runs/38147013958 > run.json
+          python3 - <<'PY'
+          import json
+          run = json.load(open('run.json'))
+          assert run['conclusion'] == 'success'
+          assert run['head_sha'] == '61bc199aacc666a8639c19f26a233cf616f815ef'
+          PY
+          gh run download 38147013958 --name BatSign-ipa --dir dist
+          echo '53eb2ea575b20884983ab35b0970184f83827e65510924f52b40e25d46b0f402  dist/BatSign.ipa' | sha256sum --check
+      - name: Create release with the verified artifact
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" dist/BatSign.ipa \
+            --draft --target "$GITHUB_SHA" \
+            --title 'BatSign 0.0.4 — Share & Install fix' \
+            --notes-file SHARE_INSTALL_RELEASE_NOTES.md
+          gh release edit "$RELEASE_TAG" --draft=false --latest

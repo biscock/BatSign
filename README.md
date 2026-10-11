@@ -4,10 +4,10 @@
 
 # BatSign
 
-**0.0.4** — an on-device signer for iOS that behaves like the App Store.
+**0.0.4 + Share & Install fix** — an on-device signer with automatic installation of shared IPA files.
 
-[![Release](https://img.shields.io/github/v/release/8yy/BatSign?style=for-the-badge&color=0a84ff)](../../releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/8yy/BatSign/total?style=for-the-badge&color=34c759)](../../releases)
+[![Release](https://img.shields.io/github/v/release/biscock/BatSign?style=for-the-badge&color=0a84ff)](../../releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/biscock/BatSign/total?style=for-the-badge&color=34c759)](../../releases)
 [![Platform](https://img.shields.io/badge/iOS-16.0%2B-blue?style=for-the-badge&logo=apple)](../../releases/latest)
 [![License](https://img.shields.io/badge/License-GPL--3.0-lightgrey?style=for-the-badge)](LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-t.me%2Fbatsigner-26A5E4?style=for-the-badge&logo=telegram)](https://t.me/batsigner)
@@ -29,6 +29,39 @@ of that — the background signing engine, the update system, the install hand-o
 is written from scratch. There is no server of mine in the middle of it and no
 analytics anywhere in the app. The one network call the app makes on its own behalf
 is a check against your own repositories.
+
+## Changes in this fork
+
+This fork of [8yy/BatSign](https://github.com/8yy/BatSign) fixes the external-file
+workflow: **Files / Safari → Share → BatSign → import → sign → install**.
+Previously, sharing an IPA could open BatSign without importing it, while the
+Shortcuts “Open File in BatSign” action could wait and then open an empty Library.
+The fixed build has been confirmed working on an iPhone by the fork maintainer.
+
+- Incoming IPA/TIPA files are copied into BatSign's own storage before asynchronous
+  extraction begins. Security-scoped access stays open until that copy completes.
+- File-provider reads use `NSFileCoordinator`; already readable Inbox copies are
+  accepted even when they do not need security-scoped access.
+- The URL handler is attached to the root view, with an import progress indicator
+  and errors queued until the app can display them.
+- A shared package immediately enters the signing/install pipeline, bypassing the
+  pending-sign tray and automatic-signing toggle for this explicitly requested job.
+- Document settings use copy-in import instead of declaring a document-browser app,
+  and the standard IPA document type is registered alongside BatSign's custom type.
+
+### Use Share & Install
+
+1. Download `BatSign.ipa` from this fork's [Releases](../../releases/latest), sign it
+   with your own certificate, and install it. **Do not enable KSign's “File Sharing”
+   modification when signing BatSign**: it changes the document-browser setting.
+2. Import your `.p12` and `.mobileprovision` into BatSign if you have not done so.
+3. Share an IPA from Files, Safari's downloaded files, or another file-sharing app
+   and choose **BatSign**. Import, signing and the install hand-off start automatically.
+
+The installation method can still require iOS's system confirmation. This does
+not add TrollStore's privileges or bypass certificate/provisioning requirements.
+The release asset is the exact unsigned IPA from the successful build that was
+installed and tested on the maintainer's iPhone; sign it with your own certificate.
 
 ## What it does
 
@@ -116,7 +149,7 @@ IDeviceKitten dependencies come in as submodules, so clone with
 
 ## Adding the source
 
-The built-in source points at this repository:
+The built-in source still points at the original upstream repository:
 
 ```
 https://raw.githubusercontent.com/8yy/BatSign/main/app-repo.json
