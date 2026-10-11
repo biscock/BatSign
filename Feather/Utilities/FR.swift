@@ -16,6 +16,7 @@ import IDeviceSwift
 	enum FR {
 		static func handlePackageFile(
 			_ ipa: URL,
+			signImmediately: Bool = false,
 			download: Download? = nil,
 			sourceProvenance: SourceAppProvenance? = nil,
 			transferID: String? = nil,
@@ -24,6 +25,7 @@ import IDeviceSwift
 			Task.detached(priority: .userInitiated) {
 				let handler = AppFileHandler(
 					file: ipa,
+					signImmediately: signImmediately,
 					download: download,
 					sourceProvenance: sourceProvenance,
 					transferID: transferID

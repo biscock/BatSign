@@ -17,6 +17,7 @@ final class AppFileHandler: NSObject, @unchecked Sendable {
 	var uniqueWorkDirPayload: URL?
 
 	private var _ipa: URL
+	private let _signImmediately: Bool
 	private let _install: Bool
 	private let _download: Download?
 	private let _sourceProvenance: SourceAppProvenance?
@@ -26,11 +27,13 @@ final class AppFileHandler: NSObject, @unchecked Sendable {
 	
 	init(
 		file ipa: URL,
+		signImmediately: Bool = false,
 		install: Bool = false,
 		download: Download? = nil,
 		sourceProvenance: SourceAppProvenance? = nil,
 		transferID: String? = nil
 	) {
+		self._signImmediately = signImmediately
 		self._ipa = ipa
 		self._install = install
 		self._download = download
@@ -204,7 +207,11 @@ final class AppFileHandler: NSObject, @unchecked Sendable {
 		let cardName = _download?.cardName ?? bundle?.name ?? "App"
 		let cardID = _download?.liveID ?? autoIdentifier ?? _uuid
 		await MainActor.run {
-				if isManualUpdateDownload {
+				if _signImmediately {
+					if !AutoSignManager.shared.enqueueImported(uuid: _uuid, force: true) {
+						_autoSignRefused(name: cardName, id: cardID, reason: "The shared IPA could not be queued for signing.")
+					}
+				} else if isManualUpdateDownload {
 					_collectOrEnqueue(
 						uuid: _uuid, reason: .autoUpdate, name: cardName, id: cardID, identifier: autoIdentifier
 					)

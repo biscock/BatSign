@@ -20,6 +20,7 @@ struct FeatherApp: App {
 
 	let heartbeat = HeartbeatManager.shared
 
+	@StateObject private var externalImport = ExternalIPAImport.shared
 	@StateObject var downloadManager = DownloadManager.shared
 	@StateObject private var autoUpdateManager = AutoUpdateManager.shared
 	@AppStorage("BatSign.biometricLock") private var _biometricLock = false
@@ -67,8 +68,14 @@ struct FeatherApp: App {
 
 				VariedTabbarView()
 					.environment(\.managedObjectContext, storage.context)
-					.onOpenURL(perform: _handleURL)
 					.transition(.move(edge: .top).combined(with: .opacity))
+			}
+			.onOpenURL(perform: _handleURL)
+			.overlay(alignment: .top) {
+				if externalImport.importingCount > 0 {
+					ProgressView("Importing IPA…")
+						.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+				}
 			}
 			// The storefront's ground, behind the whole app, so every screen and
 			// every sheet is drawn on the same surface rather than each painting its
@@ -1093,50 +1100,10 @@ struct FeatherApp: App {
 				_ = DownloadManager.shared.startDownload(from: downloadURL)
 			}
 		} else {
-			if url.pathExtension == "ipa" || url.pathExtension == "tipa" {
-				// A file handed over from Files or the share sheet lives outside
-				// this sandbox, and the access has to be released again — the old
-				// code took it and never gave it back, leaking one sandbox
-				// extension per import.
-				//
-				// The failure used to go nowhere at all: `{ _ in }` discarded it,
-				// and a `guard` on the resource returned bare, so an IPA tapped in
-				// Files did nothing with no alert, no Library row and no log.
-				if FileManager.default.isFileFromFileProvider(at: url) {
-					guard url.startAccessingSecurityScopedResource() else {
-						Logger.misc.error("import: could not reach the file that was opened")
-						_showImportFailure(url, reason: .localized("The file could not be opened."))
-						return
-					}
-
-					defer { url.stopAccessingSecurityScopedResource() }
-
-					FR.handlePackageFile(url) { error in
-						if let error {
-							_showImportFailure(url, reason: error.localizedDescription)
-						}
-					}
-				} else {
-					FR.handlePackageFile(url) { error in
-						if let error {
-							_showImportFailure(url, reason: error.localizedDescription)
-						}
-					}
-				}
-				
-				return
-			}
+			ExternalIPAImport.shared.receive(url)
 		}
 	}
 
-	/// An import that fails has to say so — the file was opened from outside the
-	/// app, so there is no list it can be seen missing from.
-	private func _showImportFailure(_ url: URL, reason: String) {
-		UIAlertController.showAlertWithOk(
-			title: .localized("Import"),
-			message: .localized("‘%@’ could not be imported: %@", arguments: url.lastPathComponent, reason)
-		)
-	}
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
